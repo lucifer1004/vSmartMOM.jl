@@ -79,16 +79,21 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     tmp_inv = similar(t⁺⁺)
 
     # Compute and store `(I - R⁺⁻ * r⁻⁺)⁻¹`
+    synchronize()
     @timeit "interaction inv1" batch_inv!(tmp_inv, I_static .- r⁻⁺ ⊠ R⁺⁻) #Suniti
+    synchronize()
     # Temporary arrays:
     # T₁₂(I-R₀₁R₂₁)⁻¹
     T01_inv = T⁻⁻ ⊠ tmp_inv;
     
-    # R₂₀ = R₁₀ + T₀₁(I-R₂₁R₀₁)⁻¹ R₂₁T₁₀ 
-    composite_layer.R⁻⁺[:] = R⁻⁺ .+ T01_inv ⊠ r⁻⁺ ⊠ T⁺⁺ #Suniti
+    # R₂₀ = R₁₀ + T₀₁(I-R₂₁R₀₁)⁻¹ R₂₁T₁₀
+    synchronize() 
+    @timeit "interaction matmul triple" composite_layer.R⁻⁺[:] = R⁻⁺ .+ T01_inv ⊠ r⁻⁺ ⊠ T⁺⁺ #Suniti
+    synchronize() 
     # T₀₂ = T₀₁(1-R₂₁R₀₁)⁻¹T₁₂
-    composite_layer.T⁻⁻[:] = T01_inv ⊠ t⁻⁻ #Suniti
-
+    synchronize() 
+    @timeit "interaction matmul double" composite_layer.T⁻⁻[:] = T01_inv ⊠ t⁻⁻ #Suniti
+    synchronize()
     if SFI
         #J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻)
         composite_layer.J₀⁻[:] = J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.J₀⁻) 
@@ -97,7 +102,9 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     # Repeating for mirror-reflected directions
 
     # Compute and store `(I - r⁻⁺ * R⁺⁻)⁻¹`
+    synchronize()
     @timeit "interaction inv2" batch_inv!(tmp_inv, I_static .- R⁺⁻ ⊠ r⁻⁺) #Suniti
+    synchronize()
     # T₂₁(I-R₀₁R₂₁)⁻¹
     T21_inv = t⁺⁺ ⊠ tmp_inv
 

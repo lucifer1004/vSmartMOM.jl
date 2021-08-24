@@ -20,6 +20,9 @@ function runner(x, parameters=parameters)
     #@show parameters.p₀
     parameters.p₀ = [x[2]];
     parameters.nᵣ = [x[3]];
+    #parameters.nᵢ = [x[4]];
+    #parameters.μ  = [x[5]];
+    #parameters.σ  = [x[6]];
     @show parameters.p₀
     model = model_from_parameters(parameters);
     
@@ -31,7 +34,7 @@ function runner(x, parameters=parameters)
 end
 
 #x = [0.1,90001.0]
-x = FT[0.1,90001.0,1.3]
+x = FT[0.1,90001.0,1.3]#, 1.0e-8, 1.3, 2.0]
 # Run FW model:
-@time runner(x);
+@time F = runner(x);
 @time dfdx = ForwardDiff.jacobian(runner, x);

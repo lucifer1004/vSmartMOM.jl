@@ -28,12 +28,22 @@ end
 
 "Given 3D CuArray A, fill in X[:,:,k] = A[:,:,k] \\ I" 
 function batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {FT}
-
     # LU-factorize A
-    @timeit "LR" pivot, info   = CUBLAS.getrf_strided_batched!(A, true);synchronize()
+    pivot, info   = CUBLAS.getrf_strided_batched!(A, true);synchronize()
     # Invert LU factorization of A
-    @timeit "RI" getri_strided_batched!(A, X, pivot); synchronize()
+    CUBLAS.getri_strided_batched!(A, X, pivot); synchronize()
     return nothing
+end
+
+function frule(
+    (_, ΔX, ΔA),
+    ::typeof(batch_inv!),
+    X::CuArray{FT,3},
+    A::CuArray{FT,3},
+) where {FT}
+    batch_inv!(X,A)
+    ΔX = -X ⊠ ΔA ⊠ X
+    return nothing # (X,ΔX )
 end
 
 
@@ -46,5 +56,5 @@ end
 
 "Batched matrix multiply (overwrite NNlib definition)"
 function batched_mul(A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
-    @timeit "BATchedMul" CUBLAS.gemm_strided_batched('N', 'N', A, B)
+    CUBLAS.gemm_strided_batched('N', 'N', A, B)
 end
