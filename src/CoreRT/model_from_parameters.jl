@@ -172,7 +172,7 @@ Modified version for vibrational Ramnan scattering
 
 
 "Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into a vSmartMOM_Model" 
-function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
+function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_1to0_plus, RRS_VS_0to1_plus}, 
                     λ₀,
                     params::vSmartMOM_Parameters)
     @show params.absorption_params.molecules

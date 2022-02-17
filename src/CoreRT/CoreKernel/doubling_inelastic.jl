@@ -142,7 +142,7 @@ function doubling_helper!(RS_type::RRS,
 end
 
 
-function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
+function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus},
                         pol_type, 
                         SFI, 
                         expk, 
@@ -151,7 +151,7 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                         I_static::AbstractArray{FT}, 
                         architecture) where {FT}
     # Unpack the added layer
-    @unpack i_λ₁λ₀_all = RS_type 
+    @unpack i_λ₁λ₀_all, i_ref = RS_type 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     # Device architecture
@@ -187,18 +187,18 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
             # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
             @views J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
-            @views ieJ₁⁺[:,1,:] = ieJ₀⁺[:,1,:] .* expk'
+            @views ieJ₁⁺[:,1,:,1] = ieJ₀⁺[:,1,:,1] .* expk'
 
             # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
             @views J₁⁻[:,1,:]   = J₀⁻[:,1,:] .* expk'
-            @views ieJ₁⁻[:,1,:] = ieJ₀⁻[:,1,:] .* expk'
+            @views ieJ₁⁻[:,1,:,1] = ieJ₀⁻[:,1,:,1] .* expk'
 
             tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
             tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
             #for n₁ in eachindex ieJ₁⁺[1,1,:,1]
             for Δn in length(i_λ₁λ₀_all)
                 n₁ = i_λ₁λ₀_all[Δn]
-                n₀ = 1
+                n₀ = i_ref
                 if n₁>0
                     # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.16 in Raman paper draft)
                     @inbounds @views ieJ₀⁺[:,:,n₁,1] = 
@@ -238,7 +238,7 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         tmp1 = gp_refl ⊠ t⁺⁺
         for Δn = 1:length(i_λ₁λ₀_all)
             n₁ = i_λ₁λ₀_all[Δn]
-            n₀ = 1
+            n₀ = i_ref
             if n₁>0
                 # (see Eqs.12 in Raman paper draft)
                 @inbounds @views iet⁺⁺[:,:,n₁,1] = tt⁺⁺_gp_refl[:,:,n₁] * 
@@ -397,7 +397,7 @@ end
 #    end
 #end
 
-function apply_D_matrix_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_stokes::Int, ier⁻⁺::AbstractArray{FT,4}, iet⁺⁺::AbstractArray{FT,4}, ier⁺⁻::AbstractArray{FT,4}, iet⁻⁻::AbstractArray{FT,4}) where {FT}
+function apply_D_matrix_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, n_stokes::Int, ier⁻⁺::AbstractArray{FT,4}, iet⁺⁺::AbstractArray{FT,4}, ier⁺⁻::AbstractArray{FT,4}, iet⁻⁻::AbstractArray{FT,4}) where {FT}
     if n_stokes == 1
         ier⁺⁻[:] = ier⁻⁺
         iet⁻⁻[:] = iet⁺⁺  
@@ -457,7 +457,7 @@ function apply_D_matrix_SFI_IE!(RS_type::RRS, n_stokes::Int, ieJ₀⁻::Abstract
 end
 
 # For S_0to1 and VS_1to0
-function apply_D_matrix_SFI_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_stokes::Int, ieJ₀⁻::AbstractArray{FT,4}) where {FT}
+function apply_D_matrix_SFI_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, n_stokes::Int, ieJ₀⁻::AbstractArray{FT,4}) where {FT}
     n_stokes == 1 && return nothing
     device = devi(architecture(ieJ₀⁻))
     aType = array_type(architecture(ieJ₀⁻))

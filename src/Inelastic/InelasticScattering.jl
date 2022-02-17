@@ -35,5 +35,6 @@ module InelasticScattering
     export AbstractRamanType
     export noRS, RRS, VS_0to1, VS_1to0
     export noRS_plus, RRS_plus, VS_0to1_plus, VS_1to0_plus
+    export RRS_VS_0to1_plus, RRS_VS_1to0_plus
 
 end # module

@@ -7,7 +7,7 @@ function getKernelDim(RS_type::RRS_plus,ier⁻⁺)
     return size(ier⁻⁺);
 end
 
-function getKernelDim(RS_type::Union{VS_0to1_plus, VS_1to0_plus},ier⁻⁺, i_λ₁λ₀)
+function getKernelDim(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, ier⁻⁺, i_λ₁λ₀)
     #@show size(ier⁻⁺,1),size(ier⁻⁺,2), size(i_λ₁λ₀,1)
     return (size(ier⁻⁺,1),size(ier⁻⁺,2), size(i_λ₁λ₀,1));
 end
@@ -16,12 +16,12 @@ function getKernelDimSFI(RS_type::RRS_plus,ieJ₀⁻)
     return size(ieJ₀⁻);
 end
 
-function getKernelDimSFI(RS_type::Union{VS_0to1_plus, VS_1to0_plus},ieJ₀⁻,i_λ₁λ₀)
+function getKernelDimSFI(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus},ieJ₀⁻,i_λ₁λ₀)
     return (size(ieJ₀⁻,1), size(i_λ₁λ₀,1));
 end
 
 "Elemental single-scattering layer for RRS"
-function elemental_inelastic!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
+function elemental_inelastic!(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus},
                             pol_type, SFI::Bool, 
                             τ_sum::AbstractArray{FT,1},
                             dτ::AbstractArray{FT,1},  # dτ_λ: total optical depth of elemental layer (per λ)
@@ -41,7 +41,12 @@ function elemental_inelastic!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     arr_type = array_type(architecture)
     τ_sum = arr_type(τ_sum)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
-    
+    ier⁺⁻ .= 0
+    ier⁻⁺ .= 0
+    iet⁻⁻ .= 0
+    iet⁺⁺ .= 0
+    ieJ₀⁺ .= 0 
+    ieJ₀⁻ .= 0
     # Later on, we can have Zs also vary with index, pretty easy here:
     #Z⁺⁺_ = reshape(Z⁺⁺_λ₁λ₀, (size(Z⁺⁺_λ₁λ₀,1), size(Z⁺⁺_λ₁λ₀,2),1))
     #Z⁻⁺_ = reshape(Z⁻⁺_λ₁λ₀, (size(Z⁺⁺_λ₁λ₀,1), size(Z⁺⁺_λ₁λ₀,2),1))
@@ -91,7 +96,7 @@ function elemental_inelastic!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 end
 
 
-#Suniti: is there a way to pass information like ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, etc. along with RS_type? So that they can be retrieved as RSS.ϖ_λ₁λ₀ for example?
+#Suniti: is there a way to pass information like ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, etc. along with RS_type? So that they can be retrieved as RRS.ϖ_λ₁λ₀ for example?
 # This one is only for RRS
 #=
 @kernel function get_elem_rt_RRS!(fscattRayl, 
@@ -191,7 +196,7 @@ function get_elem_rt!(RS_type::RRS_plus,
     end
 end
 
-function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
+function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, 
     ier⁻⁺, iet⁺⁺, 
     dτ, ϖ,
     Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
@@ -203,13 +208,16 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
             Z⁻⁺_λ₁λ₀_VS_n2, Z⁺⁺_λ₁λ₀_VS_n2,
             Z⁻⁺_λ₁λ₀_VS_o2, Z⁺⁺_λ₁λ₀_VS_o2 = RS_type
+    
     device = devi(architecture(ier⁻⁺)) #change this 
-    aType = array_type(architecture(ier⁻⁺)) 
+    aType = array_type(architecture(ier⁻⁺))
+    #println("Entered elem_rt") 
+    #@show "XX", ier⁻⁺[1,1,12630], iet⁺⁺[1,1,12630]
     #RVRS
     kernel! = get_elem_rt_VS!(device)
-
+    @show i_ref
     event = kernel!(aType(fscattRayl), 
-        aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
+        aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), i_ref,
         ier⁻⁺, iet⁺⁺, 
         dτ, ϖ, 
         aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
@@ -217,13 +225,22 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         ndrange=getKernelDim(RS_type,ier⁻⁺,i_λ₁λ₀)); 
     wait(device, event);
     synchronize_if_gpu();
-
+    #@show "A", ier⁻⁺[1,1,12630], iet⁺⁺[1,1,12630]
     t_ier⁻⁺  = similar(ier⁻⁺)
     t_iet⁺⁺  = similar(ier⁻⁺)
+    t_ier⁻⁺  .= 0
+    t_iet⁺⁺  .= 0
+    #=
+    for i in 1:length(ier⁻⁺[1,1,:])
+        #if t_ier⁻⁺[i]>0
+            @show i, ier⁻⁺[1,1,i], t_ier⁻⁺[1,1,i]
+        #end
+    end
+    =#
     #VS - N2
     kernel! = get_elem_rt_VS!(device)
     event = kernel!(fscattRayl, 
-        aType(ϖ_λ₁λ₀_VS_n2), aType(i_λ₁λ₀_VS_n2),
+        aType(ϖ_λ₁λ₀_VS_n2), aType(i_λ₁λ₀_VS_n2), i_ref,
         t_ier⁻⁺, t_iet⁺⁺, 
         dτ, ϖ, 
         aType(Z⁻⁺_λ₁λ₀_VS_n2), aType(Z⁺⁺_λ₁λ₀_VS_n2), 
@@ -232,14 +249,22 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     wait(device, event);
     synchronize_if_gpu();
 
-    ier⁻⁺ += t_ier⁻⁺
-    iet⁺⁺ += t_iet⁺⁺
+    #for i in 1:length(ier⁻⁺[1,1,:])
+    #    if t_ier⁻⁺[1,1,i]>0
+    #        @show i, ier⁻⁺[1,1,i], t_ier⁻⁺[1,1,i]
+    #    end
+    #end
 
+    ier⁻⁺ .+= t_ier⁻⁺
+    iet⁺⁺ .+= t_iet⁺⁺
+    #@show "B", ier⁻⁺[1,1,12630], iet⁺⁺[1,1,12630],t_ier⁻⁺[1,1,12630], t_iet⁺⁺[1,1,12630]
+    t_ier⁻⁺  .= 0.0
+    t_iet⁺⁺  .= 0.0
     #VS - O2
     kernel! = get_elem_rt_VS!(device)
     #@show typeof(Z⁻⁺_λ₁λ₀), typeof(Z⁺⁺_λ₁λ₀), typeof(ϖ_λ₁λ₀), typeof(i_λ₁λ₀), typeof(i_ref)
     event = kernel!(fscattRayl, 
-        aType(ϖ_λ₁λ₀_VS_o2), aType(i_λ₁λ₀_VS_o2),
+        aType(ϖ_λ₁λ₀_VS_o2), aType(i_λ₁λ₀_VS_o2), i_ref,
         t_ier⁻⁺, t_iet⁺⁺, 
         dτ, ϖ, 
         aType(Z⁻⁺_λ₁λ₀_VS_o2), aType(Z⁺⁺_λ₁λ₀_VS_o2), 
@@ -247,14 +272,14 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         ndrange=getKernelDim(RS_type,ier⁻⁺, i_λ₁λ₀_VS_o2)); 
     wait(device, event);
     synchronize_if_gpu();
-    ier⁻⁺ += t_ier⁻⁺
-    iet⁺⁺ += t_iet⁺⁺
-
+    ier⁻⁺ .+= t_ier⁻⁺
+    iet⁺⁺ .+= t_iet⁺⁺
+    #@show "C", ier⁻⁺[1,1,12630], iet⁺⁺[1,1,12630],t_ier⁻⁺[1,1,12630], t_iet⁺⁺[1,1,12630]
 end
 
 
 @kernel function get_elem_rt_VS!(fscattRayl, 
-                            ϖ_λ₁λ₀, i_λ₁λ₀, 
+                            ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, 
                             #ϖ_λ₁λ₀_VS_n2, i_λ₁λ₀_VS_n2, 
                             #ϖ_λ₁λ₀_VS_o2, i_λ₁λ₀_VS_o2, 
                             ier⁻⁺, iet⁺⁺, 
@@ -270,7 +295,7 @@ end
     #dτ₁ = 1 #dummy for now
     #Suniti: require that the incident wavelength is always the first element of 1:nSpec, and all the others belong to the same target VS band
     #Suniti: Then,
-    n₀ = 1    
+    n₀ = i_ref    
     #@show i,j,Δn
     #@show size(ier⁻⁺)
     n₁ = i_λ₁λ₀[Δn]  
@@ -283,6 +308,7 @@ end
             # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
             #@show i,j,n₁, size(ier⁻⁺)
             #@show ier⁻⁺[i,j,n₁,1]
+
             ier⁻⁺[i,j,n₁,1] = 
                     ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁻⁺_λ₁λ₀[i,j] * 
                     (1/( (qp_μN[i] / qp_μN[j]) + (dτ[n₁]/dτ[n₀]) )) * 
@@ -325,7 +351,7 @@ end
     end
 end
 
-function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
+function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, 
                         ieJ₀⁺, ieJ₀⁻, 
                         τ_sum, 
                         dτ, ϖ, 
@@ -340,14 +366,16 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
     Z⁻⁺_λ₁λ₀_VS_n2, Z⁺⁺_λ₁λ₀_VS_n2,
     Z⁻⁺_λ₁λ₀_VS_o2, Z⁺⁺_λ₁λ₀_VS_o2 = RS_type
-
+    #@show "XX", ieJ₀⁺[1,1,12630], ieJ₀⁻[1,1,12630]
     #@show fscattRayl
+    
     device = devi(architecture(ieJ₀⁺))
     aType = array_type(architecture(ieJ₀⁺))
     kernel! = get_elem_rt_SFI_VS!(device)
+    
     #@show typeof(ieJ₀⁺), typeof(τ_sum), typeof(dτ_λ),typeof(wct02), typeof(qp_μN), typeof(dτ_λ) 
     event = kernel!(fscattRayl, 
-        aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
+        aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), i_ref,
         ieJ₀⁺, ieJ₀⁻, 
         τ_sum, dτ, ϖ,
         aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
@@ -356,13 +384,15 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         ndrange=getKernelDimSFI(RS_type, ieJ₀⁻, i_λ₁λ₀)); #change this
     wait(device, event)
     synchronize_if_gpu();
-
+    #@show "A", ieJ₀⁺[1,1,12630], ieJ₀⁻[1,1,12630]
     t_ieJ₀⁺ = similar(ieJ₀⁻)
     t_ieJ₀⁻ = similar(ieJ₀⁻)
-    
+    t_ieJ₀⁺ .=0;
+    t_ieJ₀⁻ .=0
     #println("Hallo1")
+    kernel! = get_elem_rt_SFI_VS!(device)
     event = kernel!(fscattRayl, 
-        aType(ϖ_λ₁λ₀_VS_n2), aType(i_λ₁λ₀_VS_n2), 
+        aType(ϖ_λ₁λ₀_VS_n2), aType(i_λ₁λ₀_VS_n2), i_ref,
         t_ieJ₀⁺, t_ieJ₀⁻, 
         τ_sum, dτ, ϖ,
         aType(Z⁻⁺_λ₁λ₀_VS_n2), aType(Z⁺⁺_λ₁λ₀_VS_n2), 
@@ -372,12 +402,13 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     wait(device, event)
     synchronize_if_gpu();
     
-    ieJ₀⁺ += t_ieJ₀⁺
-    ieJ₀⁻ += t_ieJ₀⁻
-    
+    ieJ₀⁺ .+= t_ieJ₀⁺
+    ieJ₀⁻ .+= t_ieJ₀⁻
+    #@show "B", ieJ₀⁺[1,1,12630], ieJ₀⁻[1,1,12630]
     #println("Hallo2")
+    kernel! = get_elem_rt_SFI_VS!(device)
     event = kernel!(fscattRayl, 
-        aType(ϖ_λ₁λ₀_VS_o2), aType(i_λ₁λ₀_VS_o2), 
+        aType(ϖ_λ₁λ₀_VS_o2), aType(i_λ₁λ₀_VS_o2), i_ref,
         t_ieJ₀⁺, t_ieJ₀⁻, 
         τ_sum, dτ, ϖ,
         aType(Z⁻⁺_λ₁λ₀_VS_o2), aType(Z⁺⁺_λ₁λ₀_VS_o2), 
@@ -387,13 +418,14 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     wait(device, event)
     synchronize_if_gpu();
         
-    ieJ₀⁺ += t_ieJ₀⁺
-    ieJ₀⁻ += t_ieJ₀⁻
+    ieJ₀⁺ .+= t_ieJ₀⁺
+    ieJ₀⁻ .+= t_ieJ₀⁻
+    #@show "C", ieJ₀⁺[1,1,12630],  ieJ₀⁻[1,1,12630]
 end
 
 #  TODO: Nov 30, 2021
 @kernel function get_elem_rt_SFI_VS!(fscattRayl,
-                            ϖ_λ₁λ₀, i_λ₁λ₀, 
+                            ϖ_λ₁λ₀, i_λ₁λ₀, i_ref,
                             ieJ₀⁺, ieJ₀⁻, 
                             τ_sum, dτ, ϖ,
                             Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
@@ -410,7 +442,7 @@ end
 
     #Suniti: require that the incident wavelength is always the first element of 1:nSpec, and all the others belong to the same target VS band
     #Suniti: Then,
-    n₀ = 1    
+    n₀ = i_ref    
     n₁ = i_λ₁λ₀[Δn]  
       
     FT = eltype(I₀)

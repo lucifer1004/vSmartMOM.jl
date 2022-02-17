@@ -15,7 +15,7 @@ function getRamanSSProp(RS_type::noRS, λ, grid_in)
 
     return nothing
 end
-
+#=
 function getRamanSSProp!(RS_type::Union{VS_0to1,VS_1to0}, λ, grid_in)
     @unpack n2,o2 =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
@@ -36,6 +36,7 @@ function getRamanSSProp!(RS_type::Union{VS_0to1,VS_1to0}, λ, grid_in)
     RS_type.n_Raman = 1;
     return nothing
 end
+=#
 #function getRamanLayerSSA(RS_type::VRS_1to0, T, λ, grid_in)
 #    @unpack n2,o2 =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
@@ -64,7 +65,7 @@ function getRamanSSProp!(RS_type::RRS, λ, grid_in)
     RS_type.ϖ_Cabannes .= compute_ϖ_Cabannes(RS_type, λ, n2, o2)
     @show RS_type.ϖ_Cabannes
     # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
-    index_raman_grid, atmo_σ_RRS = compute_optical_RS!(RS_type, grid_in, λ, n2, o2)
+    index_raman_grid, atmo_σ_RRS = compute_optical_RRS!(RS_type, grid_in, λ, n2, o2)
     # declare ϖ_Raman to be a grid of length raman grid
     RS_type.ϖ_λ₁λ₀ = atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
     RS_type.i_λ₁λ₀ = index_raman_grid[end:-1:1]
@@ -95,7 +96,7 @@ function getRamanSSProp!(RS_type::RRS_plus)
         λ = nm_per_m/(0.5*(_grid_in[1]+_grid_in[end]))
         @show ϖ_Cabannes
         # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
-        index_raman_grid, atmo_σ_RRS = compute_optical_RS!(RS_type, grid_in, λ, n2, o2)
+        index_raman_grid, atmo_σ_RRS = compute_optical_RRS!(RS_type, grid_in, λ, n2, o2)
         # declare ϖ_λ₁λ₀ to be a grid of length N_raman 
         t_ϖ_λ₁λ₀ = atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl; #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
         t_i_λ₁λ₀ = index_raman_grid[end:-1:1];
@@ -190,7 +191,7 @@ function getRamanSSProp!(
             t_i_RVRS = [1]
         else 
             index_VRSgrid_out, atmo_σ_VRS, index_RVRSgrid_out, atmo_σ_RVRS = 
-                InelasticScattering.compute_optical_RS!(RS_type, 
+                InelasticScattering.compute_optical_VRS_0to1!(RS_type, 
                                             _grid_in, λ_inc, n2, o2)
 
             t_ϖ_VRS = atmo_σ_VRS/atmo_σ_Rayl
@@ -257,3 +258,490 @@ function getRamanSSProp!(
     return nothing
 end
 
+function getRamanSSProp!(
+    RS_type::VS_1to0_plus, λ_inc)
+
+@unpack n2,o2,
+    iBand, grid_in, bandSpecLim, 
+    greek_raman, greek_raman_VS_n2, greek_raman_VS_o2,
+    ϖ_Cabannes, fscattRayl,
+    ϖ_λ₁λ₀, i_λ₁λ₀,
+    ϖ_λ₁λ₀_VS_n2, i_λ₁λ₀_VS_n2,
+    ϖ_λ₁λ₀_VS_o2, i_λ₁λ₀_VS_o2,
+    i_λ₁λ₀_all =  RS_type
+#n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
+iBand = []
+grid_in = []
+bandSpecLim = []
+
+nm_per_m = 1.e7;
+greek_raman = get_greek_raman(RS_type, n2, o2)
+greek_raman_VS_n2 = get_greek_raman_VS(RS_type, n2)
+greek_raman_VS_o2 = get_greek_raman_VS(RS_type, o2)
+#λ_scatt = 2.e7/(grid_in[1]+grid_in[end])     
+# determine Rayleigh scattering cross-section at incident wavelength λ 
+atmo_σ_Rayl = compute_optical_Rayl(λ_inc, n2, o2)
+# determine VRS_0to1 bands for λ₀ due to n2 and o2  
+nBand = 3; #for n2 and o2 each
+iBand = [1,2,3];
+ν̄ = nm_per_m/λ_inc
+push!(grid_in, ν̄:0.1:ν̄)
+molec = [n2,o2]
+#========================================================================#
+for mol in molec
+
+y1 = mol.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2;
+y2 = mol.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2;
+
+band_min = minimum([minimum(y1[y1.!=0]), minimum(y2[y2.!=0])]);
+band_min += nm_per_m/λ_inc;
+band_min -= 2.;
+
+band_max = maximum([maximum(y1[y1.!=0]), maximum(y2[y2.!=0])]);
+band_max += nm_per_m/λ_inc;
+band_max += 2.;
+
+push!(grid_in, band_min:0.05:band_max)
+
+end
+#========================================================================#
+FT = eltype(λ_inc);
+t_w_VS = Vector{Vector{FT}}(undef,0)
+t_i_VS = Vector{Vector{Int}}(undef,0)
+t_w_RVS = Vector{Vector{FT}}(undef,0)
+t_i_RVS = Vector{Vector{Int}}(undef,0)
+
+ϖ_Cabannes = zeros(FT, nBand) 
+fscattRayl = zeros(FT, nBand)
+#k_Rayl_scatt = zeros(FT, nBands)
+
+for iB = 1:nBand
+_grid_in = grid_in[iB]
+λ = nm_per_m/(0.5*(_grid_in[1]+_grid_in[end]))
+
+if iB==1
+    ϖ_Cabannes[iB] = InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc, n2, o2)
+    @show ϖ_Cabannes
+else
+    ϖ_Cabannes[iB] = 1.
+end
+if iB==1
+    t_ϖ_VRS = [0.]
+    t_i_VRS = [1]
+    t_ϖ_RVRS = [0.]
+    t_i_RVRS = [1]
+else 
+    index_VRSgrid_out, atmo_σ_VRS, index_RVRSgrid_out, atmo_σ_RVRS = 
+        InelasticScattering.compute_optical_VRS_1to0!(RS_type, 
+                                    _grid_in, λ_inc, n2, o2)
+
+    t_ϖ_VRS = atmo_σ_VRS/atmo_σ_Rayl
+    t_i_VRS = index_VRSgrid_out
+    t_ϖ_RVRS = atmo_σ_RVRS/atmo_σ_Rayl
+    t_i_RVRS = index_RVRSgrid_out
+end
+push!(t_w_VS, t_ϖ_VRS);
+push!(t_i_VS, t_i_VRS);
+
+push!(t_w_RVS, t_ϖ_RVRS);
+push!(t_i_RVS, t_i_RVRS);
+
+#k_Rayl_scatt[iB] = compute_optical_Rayl(λ₀, n2, o2)/atmo_σ_Rayl
+
+end
+n_Raman = 1;
+bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
+#Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
+nSpec = 0;
+for iB in iBand
+nSpec0 = nSpec+1;
+nSpec += size(grid_in[iB], 1); # Number of spectral points
+push!(bandSpecLim,nSpec0:nSpec);                
+end
+
+i_λ₁λ₀ = zeros(Int, length(t_i_RVS[2])+length(t_i_RVS[3]));
+ϖ_λ₁λ₀ = zeros( FT, length(t_i_RVS[2])+length(t_i_RVS[3]));
+i_λ₁λ₀_VS_n2 = zeros(Int, length(t_i_VS[2])+length(t_i_VS[3]));
+ϖ_λ₁λ₀_VS_n2 = zeros( FT, length(t_i_VS[2])+length(t_i_VS[3]));
+i_λ₁λ₀_VS_o2 = zeros(Int, length(t_i_VS[2])+length(t_i_VS[3]));
+ϖ_λ₁λ₀_VS_o2 = zeros( FT, length(t_i_VS[2])+length(t_i_VS[3]));
+
+for Δn = 1:length(t_i_RVS[2])
+i_λ₁λ₀[Δn] = bandSpecLim[2][1] - 1 + t_i_RVS[2][Δn];
+ϖ_λ₁λ₀[Δn] = t_w_RVS[2][Δn];
+end
+for Δn = (length(t_i_RVS[2])+1):(length(t_i_RVS[2])+length(t_i_RVS[3]))
+i_λ₁λ₀[Δn] = bandSpecLim[3][1] - 1 + t_i_RVS[3][Δn-length(t_i_RVS[2])];
+ϖ_λ₁λ₀[Δn] = t_w_RVS[3][Δn-length(t_i_RVS[2])];
+end
+
+for Δn = 1:length(t_i_VS[2])
+i_λ₁λ₀_VS_n2[Δn] = bandSpecLim[2][1] - 1 + t_i_VS[2][Δn];
+ϖ_λ₁λ₀_VS_n2[Δn] = t_w_VS[2][Δn];
+end
+
+for Δn = (length(t_i_VS[2])+1):(length(t_i_VS[2])+length(t_i_VS[3]))
+i_λ₁λ₀_VS_o2[Δn] = bandSpecLim[3][1] - 1 + t_i_VS[3][Δn-length(t_i_VS[2])];
+ϖ_λ₁λ₀_VS_o2[Δn] = t_w_VS[3][Δn-length(t_i_VS[2])];
+end
+i_λ₁λ₀_all = unique(cat(i_λ₁λ₀, i_λ₁λ₀_VS_n2, i_λ₁λ₀_VS_o2, dims = (1)))
+
+@pack! RS_type =
+    iBand, grid_in, bandSpecLim,  
+    i_λ₁λ₀, ϖ_λ₁λ₀, 
+    i_λ₁λ₀_VS_n2, ϖ_λ₁λ₀_VS_n2,
+    i_λ₁λ₀_VS_o2, ϖ_λ₁λ₀_VS_o2,
+    i_λ₁λ₀_all,
+    ϖ_Cabannes, fscattRayl,
+    greek_raman,
+    greek_raman_VS_n2,
+    greek_raman_VS_o2
+return nothing
+end
+
+function getRamanSSProp!(
+    RS_type::RRS_VS_0to1_plus, λ_inc)
+
+    @unpack n2,o2,
+        iBand, grid_in, bandSpecLim, 
+        greek_raman, greek_raman_VS_n2, greek_raman_VS_o2,
+        ϖ_Cabannes, fscattRayl,
+        ϖ_λ₁λ₀, i_λ₁λ₀,
+        ϖ_λ₁λ₀_VS_n2, i_λ₁λ₀_VS_n2,
+        ϖ_λ₁λ₀_VS_o2, i_λ₁λ₀_VS_o2,
+        i_λ₁λ₀_all, i_ref =  RS_type
+    #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
+    iBand = []
+    grid_in = []
+    bandSpecLim = []
+
+    nm_per_m = 1.e7;
+    greek_raman = get_greek_raman(RS_type, n2, o2)
+    greek_raman_VS_n2 = get_greek_raman_VS(RS_type, n2)
+    greek_raman_VS_o2 = get_greek_raman_VS(RS_type, o2)
+    #λ_scatt = 2.e7/(grid_in[1]+grid_in[end])     
+    # determine Rayligh scattering cross-section at incident wavelength λ 
+    atmo_σ_Rayl = compute_optical_Rayl(λ_inc, n2, o2)
+    # determine VRS_0to1 bands for λ₀ due to n2 and o2  
+    nBand = 3; #for n2 and o2 each
+    iBand = [1,2,3];
+
+    y1 = n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2;
+    y2 = n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2;
+    z1 = o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2;
+    z2 = o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2;
+
+    band_min = minimum([minimum(y1[y1.!=0]), minimum(y2[y2.!=0]), minimum(z1[z1.!=0]), minimum(z2[z2.!=0])]);
+    band_min += nm_per_m/λ_inc;
+    band_min -= 2.;
+
+    band_max = maximum([maximum(y1[y1.!=0]), maximum(y2[y2.!=0]), maximum(z1[z1.!=0]), maximum(z2[z2.!=0])]);
+    band_max += nm_per_m/λ_inc;
+    band_max += 2.;
+
+    push!(grid_in, band_min:0.05:band_max)
+
+    #ν̄ = nm_per_m/λ_inc
+    #push!(grid_in, ν̄:0.1:ν̄)
+    molec = [o2,n2]
+    #========================================================================#
+    for mol in molec
+
+        y1 = mol.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2;
+        y2 = mol.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2;
+
+        band_min = minimum([minimum(y1[y1.!=0]), minimum(y2[y2.!=0])]);
+        band_min += nm_per_m/λ_inc;
+        band_min -= 2.;
+
+        band_max = maximum([maximum(y1[y1.!=0]), maximum(y2[y2.!=0])]);
+        band_max += nm_per_m/λ_inc;
+        band_max += 2.;
+
+        push!(grid_in, band_min:0.05:band_max)
+    end
+    #========================================================================#
+    FT = eltype(λ_inc);
+    
+    t_w_VS = Vector{Vector{FT}}(undef,0)
+    t_i_VS = Vector{Vector{Int}}(undef,0)
+    t_w_RVS = Vector{Vector{FT}}(undef,0)
+    t_i_RVS = Vector{Vector{Int}}(undef,0)
+
+    ϖ_Cabannes = zeros(FT, nBand) 
+    fscattRayl = zeros(FT, nBand)
+    #k_Rayl_scatt = zeros(FT, nBands)
+
+    for iB = 1:nBand
+        _grid_in = grid_in[iB]
+        λ = nm_per_m/(0.5*(_grid_in[1]+_grid_in[end]))
+
+        if iB==1
+            ϖ_Cabannes[iB] = InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc, n2, o2)
+            @show ϖ_Cabannes
+        else
+            ϖ_Cabannes[iB] = 1.
+        end
+        if iB==1
+            index_ramangrid_out, atmo_σ_RRS = 
+                InelasticScattering.compute_optical_RRS!(RS_type, 
+                                            _grid_in, λ_inc, n2, o2)
+            #t_ϖ_VRS = [0]
+            #t_i_VRS = [1]
+            t_ϖ_RVRS = atmo_σ_RRS[index_ramangrid_out.!=0]/atmo_σ_Rayl
+            t_i_RVRS = index_ramangrid_out[index_ramangrid_out.!=0]
+            
+        else 
+            index_VRSgrid_out, atmo_σ_VRS, index_RVRSgrid_out, atmo_σ_RVRS = 
+                InelasticScattering.compute_optical_VRS_0to1!(RS_type, 
+                                            _grid_in, λ_inc, n2, o2)
+
+            t_ϖ_VRS = atmo_σ_VRS[index_VRSgrid_out.!=0]/atmo_σ_Rayl
+            t_i_VRS = index_VRSgrid_out[index_VRSgrid_out.!=0]
+            t_ϖ_RVRS = atmo_σ_RVRS[index_RVRSgrid_out.!=0]/atmo_σ_Rayl
+            t_i_RVRS = index_RVRSgrid_out[index_RVRSgrid_out.!=0]
+            push!(t_w_VS, t_ϖ_VRS);
+        push!(t_i_VS, t_i_VRS);
+        end
+        
+
+        push!(t_w_RVS, t_ϖ_RVRS);
+        push!(t_i_RVS, t_i_RVRS);
+
+        #k_Rayl_scatt[iB] = compute_optical_Rayl(λ₀, n2, o2)/atmo_σ_Rayl
+
+    end
+    n_Raman = 1;
+    bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
+    #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
+    nSpec = 0;
+    for iB in iBand
+        nSpec0 = nSpec+1;
+        nSpec += size(grid_in[iB], 1); # Number of spectral points
+        push!(bandSpecLim,nSpec0:nSpec);                
+    end
+
+    i_λ₁λ₀ = zeros(Int, length(t_i_RVS[1])+length(t_i_RVS[2])+length(t_i_RVS[3]));
+    ϖ_λ₁λ₀ = zeros( FT, length(t_i_RVS[1])+length(t_i_RVS[2])+length(t_i_RVS[3]));
+    i_λ₁λ₀_VS_o2 = zeros(Int, length(t_i_VS[1]));
+    ϖ_λ₁λ₀_VS_o2 = zeros( FT, length(t_i_VS[1]));
+    i_λ₁λ₀_VS_n2 = zeros(Int, length(t_i_VS[2]));
+    ϖ_λ₁λ₀_VS_n2 = zeros( FT, length(t_i_VS[2]));
+    
+    # Rotational
+    for Δn = 1:length(t_i_RVS[1])
+        i_λ₁λ₀[Δn] = bandSpecLim[1][1] - 1 + t_i_RVS[1][Δn];
+        ϖ_λ₁λ₀[Δn] = t_w_RVS[1][Δn];
+    end
+    # Rovibrational o2
+    i_off = length(t_i_RVS[1]);
+    for Δn = (i_off+1):(i_off+length(t_i_RVS[2]))
+        i_λ₁λ₀[Δn] = bandSpecLim[2][1] - 1 + t_i_RVS[2][Δn-i_off];
+        ϖ_λ₁λ₀[Δn] = t_w_RVS[2][Δn-i_off];
+    end
+    # Rovibrational n2
+    i_off = length(t_i_RVS[1])+length(t_i_RVS[2]);
+    for Δn = (i_off+1):(i_off+length(t_i_RVS[3]))
+        i_λ₁λ₀[Δn] = bandSpecLim[3][1] - 1 + t_i_RVS[3][Δn-i_off];
+        ϖ_λ₁λ₀[Δn] = t_w_RVS[3][Δn-i_off];
+    end
+    # Vibrational o2
+    i_off = 0;#length(t_i_VS[1]);
+    for Δn = (i_off+1):(i_off+length(t_i_VS[1]))
+        i_λ₁λ₀_VS_o2[Δn] = bandSpecLim[1][1] - 1 + t_i_VS[1][Δn-i_off];
+        ϖ_λ₁λ₀_VS_o2[Δn] = t_w_VS[1][Δn-i_off];
+    end    
+    # Vibrational n2
+    i_off = 0;#length(t_i_VS[1])+length(t_i_VS[2]);
+    for Δn = (i_off+1):(i_off+length(t_i_VS[2]))
+        i_λ₁λ₀_VS_n2[Δn] = bandSpecLim[2][1] - 1 + t_i_VS[2][Δn-i_off];
+        ϖ_λ₁λ₀_VS_n2[Δn] = t_w_VS[2][Δn-i_off];
+    end
+    i_λ₁λ₀_all = unique(cat(i_λ₁λ₀, i_λ₁λ₀_VS_n2, i_λ₁λ₀_VS_o2, dims = (1)))
+    i_ref      = argmin(abs.(grid_in[1] .- nm_per_m/λ_inc))
+    @pack! RS_type =
+        iBand, grid_in, bandSpecLim,  
+        i_λ₁λ₀, ϖ_λ₁λ₀, 
+        i_λ₁λ₀_VS_n2, ϖ_λ₁λ₀_VS_n2,
+        i_λ₁λ₀_VS_o2, ϖ_λ₁λ₀_VS_o2,
+        i_λ₁λ₀_all, i_ref,
+        ϖ_Cabannes, fscattRayl,
+        greek_raman,
+        greek_raman_VS_n2,
+        greek_raman_VS_o2
+    return nothing
+end
+
+
+function getRamanSSProp!(
+    RS_type::RRS_VS_1to0_plus, λ_inc)
+
+    @unpack n2,o2,
+        iBand, grid_in, bandSpecLim, 
+        greek_raman, greek_raman_VS_n2, greek_raman_VS_o2,
+        ϖ_Cabannes, fscattRayl,
+        ϖ_λ₁λ₀, i_λ₁λ₀,
+        ϖ_λ₁λ₀_VS_n2, i_λ₁λ₀_VS_n2,
+        ϖ_λ₁λ₀_VS_o2, i_λ₁λ₀_VS_o2,
+        i_λ₁λ₀_all, i_ref =  RS_type
+    #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
+    iBand = []
+    grid_in = []
+    bandSpecLim = []
+
+    nm_per_m = 1.e7;
+    greek_raman = get_greek_raman(RS_type, n2, o2)
+    greek_raman_VS_n2 = get_greek_raman_VS(RS_type, n2)
+    greek_raman_VS_o2 = get_greek_raman_VS(RS_type, o2)
+    #λ_scatt = 2.e7/(grid_in[1]+grid_in[end])     
+    # determine Rayligh scattering cross-section at incident wavelength λ 
+    atmo_σ_Rayl = compute_optical_Rayl(λ_inc, n2, o2)
+    # determine VRS_0to1 bands for λ₀ due to n2 and o2  
+    nBand = 3; #for n2 and o2 each
+    iBand = [1,2,3];
+
+    y1 = n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2;
+    y2 = n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2;
+    z1 = o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2;
+    z2 = o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2;
+
+    band_min = minimum([minimum(y1[y1.!=0]), minimum(y2[y2.!=0]), minimum(z1[z1.!=0]), minimum(z2[z2.!=0])]);
+    band_min += nm_per_m/λ_inc;
+    band_min -= 2.;
+
+    band_max = maximum([maximum(y1[y1.!=0]), maximum(y2[y2.!=0]), maximum(z1[z1.!=0]), maximum(z2[z2.!=0])]);
+    band_max += nm_per_m/λ_inc;
+    band_max += 2.;
+
+    push!(grid_in, band_min:0.05:band_max)
+
+    #ν̄ = nm_per_m/λ_inc
+    #push!(grid_in, ν̄:0.1:ν̄)
+    molec = [o2,n2]
+    #========================================================================#
+    for mol in molec
+
+        y1 = mol.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2;
+        y2 = mol.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2;
+
+        band_min = minimum([minimum(y1[y1.!=0]), minimum(y2[y2.!=0])]);
+        band_min += nm_per_m/λ_inc;
+        band_min -= 2.;
+
+        band_max = maximum([maximum(y1[y1.!=0]), maximum(y2[y2.!=0])]);
+        band_max += nm_per_m/λ_inc;
+        band_max += 2.;
+
+        push!(grid_in, band_min:0.05:band_max)
+    end
+    #========================================================================#
+    FT = eltype(λ_inc);
+    
+    t_w_VS = Vector{Vector{FT}}(undef,0)
+    t_i_VS = Vector{Vector{Int}}(undef,0)
+    t_w_RVS = Vector{Vector{FT}}(undef,0)
+    t_i_RVS = Vector{Vector{Int}}(undef,0)
+
+    ϖ_Cabannes = zeros(FT, nBand) 
+    fscattRayl = zeros(FT, nBand)
+    #k_Rayl_scatt = zeros(FT, nBands)
+
+    for iB = 1:nBand
+        _grid_in = grid_in[iB]
+        λ = nm_per_m/(0.5*(_grid_in[1]+_grid_in[end]))
+
+        if iB==1
+            ϖ_Cabannes[iB] = InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc, n2, o2)
+            @show ϖ_Cabannes
+        else
+            ϖ_Cabannes[iB] = 1.
+        end
+        if iB==1
+            index_ramangrid_out, atmo_σ_RRS = 
+                InelasticScattering.compute_optical_RRS!(RS_type, 
+                                            _grid_in, λ_inc, n2, o2)
+            #t_ϖ_VRS = [0.]
+            #t_i_VRS = [1]
+            t_ϖ_RVRS = atmo_σ_RRS[index_ramangrid_out.!=0]/atmo_σ_Rayl
+            t_i_RVRS = index_ramangrid_out[index_ramangrid_out.!=0]
+            
+        else 
+            index_VRSgrid_out, atmo_σ_VRS, index_RVRSgrid_out, atmo_σ_RVRS = 
+                InelasticScattering.compute_optical_VRS_1to0!(RS_type, 
+                                            _grid_in, λ_inc, n2, o2)
+
+            t_ϖ_VRS = atmo_σ_VRS[index_VRSgrid_out.!=0]/atmo_σ_Rayl
+            t_i_VRS = index_VRSgrid_out[index_VRSgrid_out.!=0]
+            t_ϖ_RVRS = atmo_σ_RVRS[index_RVRSgrid_out.!=0]/atmo_σ_Rayl
+            t_i_RVRS = index_RVRSgrid_out[index_RVRSgrid_out.!=0]
+            push!(t_w_VS, t_ϖ_VRS);
+            push!(t_i_VS, t_i_VRS);
+        end
+        
+
+        push!(t_w_RVS, t_ϖ_RVRS);
+        push!(t_i_RVS, t_i_RVRS);
+
+        #k_Rayl_scatt[iB] = compute_optical_Rayl(λ₀, n2, o2)/atmo_σ_Rayl
+
+    end
+    n_Raman = 1;
+    bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
+    #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
+    nSpec = 0;
+    for iB in iBand
+        nSpec0 = nSpec+1;
+        nSpec += size(grid_in[iB], 1); # Number of spectral points
+        push!(bandSpecLim,nSpec0:nSpec);                
+    end
+
+    i_λ₁λ₀ = zeros(Int, length(t_i_RVS[1])+length(t_i_RVS[2])+length(t_i_RVS[3]));
+    ϖ_λ₁λ₀ = zeros( FT, length(t_i_RVS[1])+length(t_i_RVS[2])+length(t_i_RVS[3]));
+    i_λ₁λ₀_VS_o2 = zeros(Int, length(t_i_VS[1]));
+    ϖ_λ₁λ₀_VS_o2 = zeros( FT, length(t_i_VS[1]));
+    i_λ₁λ₀_VS_n2 = zeros(Int, length(t_i_VS[2]));
+    ϖ_λ₁λ₀_VS_n2 = zeros( FT, length(t_i_VS[2]));
+
+    # Rotational
+    for Δn = 1:length(t_i_RVS[1])
+        i_λ₁λ₀[Δn] = bandSpecLim[1][1] - 1 + t_i_RVS[1][Δn];
+        ϖ_λ₁λ₀[Δn] = t_w_RVS[1][Δn];
+    end
+    # Rovibrational o2
+    i_off = length(t_i_RVS[1]);
+    for Δn = (i_off+1):(i_off+length(t_i_RVS[2]))
+        i_λ₁λ₀[Δn] = bandSpecLim[2][1] - 1 + t_i_RVS[2][Δn-i_off];
+        ϖ_λ₁λ₀[Δn] = t_w_RVS[2][Δn-i_off];
+    end
+    # Rovibrational n2
+    i_off = length(t_i_RVS[1])+length(t_i_RVS[2]);
+    for Δn = (i_off+1):(i_off+length(t_i_RVS[3]))
+        i_λ₁λ₀[Δn] = bandSpecLim[3][1] - 1 + t_i_RVS[3][Δn-i_off];
+        ϖ_λ₁λ₀[Δn] = t_w_RVS[3][Δn-i_off];
+    end
+    # Vibrational o2
+    i_off = 0; #length(t_i_VS[1]);
+    for Δn = (i_off+1):(i_off+length(t_i_VS[1]))
+        i_λ₁λ₀_VS_o2[Δn] = bandSpecLim[1][1] - 1 + t_i_VS[1][Δn-i_off];
+        ϖ_λ₁λ₀_VS_o2[Δn] = t_w_VS[1][Δn-i_off];
+    end    
+    # Vibrational n2
+    i_off = 0;#length(t_i_VS[2]);
+    for Δn = (i_off+1):(i_off+length(t_i_VS[2]))
+        i_λ₁λ₀_VS_n2[Δn] = bandSpecLim[2][1] - 1 + t_i_VS[2][Δn-i_off];
+        ϖ_λ₁λ₀_VS_n2[Δn] = t_w_VS[2][Δn-i_off];
+    end
+    i_λ₁λ₀_all = unique(cat(i_λ₁λ₀, i_λ₁λ₀_VS_n2, i_λ₁λ₀_VS_o2, dims = (1)))
+    i_ref      = argmin(abs.(grid_in[1] .- nm_per_m/λ_inc))
+    @pack! RS_type =
+        iBand, grid_in, bandSpecLim,  
+        i_λ₁λ₀, ϖ_λ₁λ₀, 
+        i_λ₁λ₀_VS_n2, ϖ_λ₁λ₀_VS_n2,
+        i_λ₁λ₀_VS_o2, ϖ_λ₁λ₀_VS_o2,
+        i_λ₁λ₀_all, i_ref,
+        ϖ_Cabannes, fscattRayl,
+        greek_raman,
+        greek_raman_VS_n2,
+        greek_raman_VS_o2
+    return nothing
+end

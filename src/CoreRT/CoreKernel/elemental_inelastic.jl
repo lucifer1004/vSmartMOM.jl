@@ -485,7 +485,7 @@ end
     end
 end
 
-@kernel function apply_D_elemental_VS!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
+@kernel function apply_D_elemental_VS!(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus},
                         ndoubl, pol_n, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
 
     i, j, n₁, _ = @index(Global, NTuple)
@@ -507,7 +507,7 @@ end
     end
 end
 
-@kernel function apply_D_elemental_SFI!(RS_type::Union{VS_0to1, VS_1to0, VS_0to1_plus, VS_1to0_plus}, 
+@kernel function apply_D_elemental_SFI!(RS_type::Union{VS_0to1, VS_1to0, VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, 
                         ndoubl, pol_n, ieJ₀⁻)
     i, _, Δn = @index(Global, NTuple)
     @unpack i_λ₁λ₀ = RS_type
@@ -534,7 +534,7 @@ function apply_D_matrix_elemental!(RS_type::Union{RRS, RRS_plus}, ndoubl::Int, n
     return nothing
 end
 
-function apply_D_matrix_elemental!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
+function apply_D_matrix_elemental!(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, 
                         ndoubl::Int, n_stokes::Int, 
                         ier⁻⁺::AbstractArray{FT,4}, 
                         iet⁺⁺::AbstractArray{FT,4}, 
@@ -549,7 +549,7 @@ function apply_D_matrix_elemental!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     return nothing
 end
 
-function apply_D_matrix_elemental_SFI!(RS_type::Union{RRS, RRS_plus, VS_0to1_plus, VS_1to0_plus},
+function apply_D_matrix_elemental_SFI!(RS_type::Union{RRS, RRS_plus, VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus},
         ndoubl::Int, n_stokes::Int, ieJ₀⁻::AbstractArray{FT,4}) where {FT}
     if ndoubl > 1
         return nothing

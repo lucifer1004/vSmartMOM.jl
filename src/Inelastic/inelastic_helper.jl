@@ -45,7 +45,7 @@ function compute_ϖ_Cabannes(RS_type::noRS, λ₀)
     return RS_type.ϖ_Cabannes;
 end
 
-function compute_ϖ_Cabannes(RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus}, λ₀, n2, o2)
+function compute_ϖ_Cabannes(RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, λ₀, n2, o2)
     ν₀ = 1e7/λ₀;
 
     σ_elastic =  n2.vmr * n2.effCoeff.σ_Rayl_coeff + o2.vmr * o2.effCoeff.σ_Rayl_coeff 
@@ -226,7 +226,7 @@ function compute_optical_Rayl(λ₀, n2, o2)
     return atmo_σ_Rayl;
 end
 
-function compute_optical_RS!(RS_type::Union{RRS, RRS_plus}, grid_in, λ₀, n2, o2)
+function compute_optical_RRS!(RS_type::Union{RRS, RRS_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, grid_in, λ₀, n2, o2)
     #plotly()
     # grid_in is a uniform wavenumber grid covering the entire band spectrum 
     # TMP: grid_in = nm_per_m/λ₀.+collect(-250:0.002:250) #this is a wavenumber grid
@@ -276,7 +276,7 @@ function compute_optical_RS!(RS_type::Union{RRS, RRS_plus}, grid_in, λ₀, n2, 
     #plot(1.e7/λ₀ .+ grid_out, atmo_σ_RRS_plot*1.e40)
 end
 
-function compute_optical_RS!(RS_type::Union{VS_0to1, VS_0to1_plus}, grid_in, λ₀, n2, o2)
+function compute_optical_VRS_0to1!(RS_type::Union{RRS_VS_0to1_plus, VS_0to1, VS_0to1_plus}, grid_in, λ₀, n2, o2)
     #plotly()
     #get_greek_raman(RS_type, n2, o2)
     #compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
@@ -337,21 +337,18 @@ function compute_optical_RS!(RS_type::Union{VS_0to1, VS_0to1_plus}, grid_in, λ�
 end
 
 
-function compute_optical_RS!(RS_type::Union{VS_1to0, VS_1to0_plus}, grid_in, λ₀, n2, o2)
+function compute_optical_VRS_1to0!(RS_type::Union{RRS_VS_1to0_plus, VS_1to0, VS_1to0_plus}, grid_in, λ₀, n2, o2)
     #plotly()
-    get_greek_raman(RS_type, n2, o2)
-    compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
-    @show n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0], o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0]
-    νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0] + o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0])
+    #get_greek_raman(RS_type, n2, o2)
+    #compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
+    #@show n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0], o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0]
+    #νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0] + o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0])
         
     # TMP: grid_in = nm_per_m/λ₀ + collect((νᵣ-750):0.002:(νᵣ+750))
-    σ_out = similar(collect(grid_in));        
-    atmo_σ_VRS_1to0 = similar(grid_in);
-    atmo_σ_RVRS_1to0 = similar(grid_in);
+    σ_out = similar(grid_in);        
     σ_tmpVRS = similar(grid_in);
     σ_tmpRVRS = similar(grid_in);
 
-    @show n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1], o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1]
     #νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1] + o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1])
     #grid_out = (νᵣ-750):0.002:(νᵣ+750)
     #σ_out = similar(collect(grid_out));
@@ -360,13 +357,13 @@ function compute_optical_RS!(RS_type::Union{VS_1to0, VS_1to0_plus}, grid_in, λ�
     yin = [n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2.parent; n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2.parent];
     #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
     apply_gridlines!(xin[abs.(xin).>0], yin[abs.(xin).>0], λ₀, grid_in, σ_out);
-    σ_RVRStmp= n2.vmr * σ_out #cross section in cm^2
+    σ_tmpRVRS= n2.vmr * σ_out #cross section in cm^2
 
     xin = n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires
     yin = n2.effCoeff.σ_VibRaman_coeff_1to0_hires
     #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
     apply_gridlines!(xin, yin, λ₀, grid_in, σ_out);
-    σ_VRStmp = n2.vmr * σ_out #cross section in cm^2
+    σ_tmpVRS = n2.vmr * σ_out #cross section in cm^2
 
     # O2
     xin = [o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2.parent; o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2.parent]
@@ -374,19 +371,19 @@ function compute_optical_RS!(RS_type::Union{VS_1to0, VS_1to0_plus}, grid_in, λ�
     #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
     
     apply_gridlines!(xin[abs.(xin).>0], yin[abs.(xin).>0], λ₀, grid_in, σ_out);
-    σ_RVRStmp += o2.vmr * σ_out #cross section in cm^2
+    σ_tmpRVRS += o2.vmr * σ_out #cross section in cm^2
     
     xin = o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires
     yin = o2.effCoeff.σ_VibRaman_coeff_1to0_hires
     #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
     apply_gridlines!(xin, yin, λ₀, grid_in, σ_out);
-    σ_VRStmp += o2.vmr * σ_out #cross section in cm^2
+    σ_tmpVRS += o2.vmr * σ_out #cross section in cm^2
 
-    atmo_σ_VRS_1to0 .= σ_tmpVRS(σ_VRStmp.>0)
+    atmo_σ_VRS_1to0 = σ_tmpVRS[σ_tmpVRS.>0]
     #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
     index_VRSgrid_out = findall(x->x in σ_tmpVRS[σ_tmpVRS.>0],σ_tmpVRS)
 
-    atmo_σ_RVRS_1to0 .= σ_tmpRVRS(σ_RVRStmp.>0)
+    atmo_σ_RVRS_1to0 = σ_tmpRVRS[σ_tmpRVRS.>0]
     #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
     index_RVRSgrid_out = findall(x->x in σ_tmpRVRS[σ_tmpRVRS.>0],σ_tmpRVRS)
 
@@ -407,7 +404,7 @@ function get_greek_raman!(RS_type::noRS, n2, o2)
 end
 
 # the following applies to both rovibrational and rotational Raman scattering (by both N2 and O2)
-function get_greek_raman(RS_type::Union{RRS, RRS_plus, VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus}, 
+function get_greek_raman(RS_type::Union{RRS, RRS_plus, VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, 
                             n2, o2)
     depol = n2.effCoeff.rho_depol_RotRaman
     FT = eltype(depol)
@@ -427,7 +424,7 @@ function get_greek_raman(RS_type::Union{RRS, RRS_plus, VS_0to1, VS_0to1_plus, VS
     #return nothing
 end
 
-function get_greek_raman_VS(RS_type::Union{VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus}, 
+function get_greek_raman_VS(RS_type::Union{VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, 
                             in_molec)
     
     depol = in_molec.effCoeff.rho_depol_VibRaman

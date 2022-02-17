@@ -248,7 +248,7 @@ function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type,
 end
 
 function rt_kernel!(
-            RS_type::Union{RRS_plus{FT}, VS_0to1_plus{FT}, VS_1to0_plus{FT}}, 
+            RS_type::Union{RRS_plus{FT}, RRS_VS_0to1_plus{FT}, RRS_VS_1to0_plus{FT}}, 
             pol_type, SFI, 
             added_layer, 
             composite_layer, 

@@ -98,7 +98,7 @@ make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec) = A
                                                         )
 
 "Make an added layer, supplying all default matrices"
-make_added_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
+make_added_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec),
@@ -134,7 +134,7 @@ make_composite_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec)
                                                         default_J_matrix(FT, arr_type, dims, nSpec)
                                                         )
 "Make a composite layer, supplying all default matrices"
-make_composite_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec) = CompositeLayerRS(
+make_composite_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, FT, arr_type, dims, nSpec) = CompositeLayerRS(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec),

@@ -89,30 +89,32 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_01, SFI,
     composite_layer.T⁻⁻[:] = composite_layer.T⁻⁻ ⊠ added_layer.t⁻⁻    
 end
 
-function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
+function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, 
                         ::ScatteringInterface_01, SFI,
                         composite_layer::CompositeLayer{FT}, 
                         added_layer::AddedLayer{FT}, 
                         I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
-    @unpack i_λ₁λ₀_all = RS_type                             
+    @unpack i_λ₁λ₀_all, i_ref = RS_type                             
     if SFI
         J₀⁺, J₀⁻ = similar(composite_layer.J₀⁺), similar(composite_layer.J₀⁺)
         ieJ₀⁺, ieJ₀⁻ = similar(composite_layer.ieJ₀⁺), similar(composite_layer.ieJ₀⁺)
 
         for Δn = 1:length(i_λ₁λ₀_all)
             n₁ = i_λ₁λ₀_all[Δn]
-            n₀ = 1
+            n₀ = i_ref
             if (n₁>0)
                 # TODO: replace all the n₀ indices with ref_r, ref_t, and ref_J
-                ieJ₀⁻[:,1,n₁,n₀] = 
-                    composite_layer.T⁻⁻[:,:,n₁] * (added_layer.ier⁻⁺[:,:,n₁,1] * 
+                ieJ₀⁻[:,1,n₁,1] = 
+                    composite_layer.T⁻⁻[:,:,n₁] * 
+                    (added_layer.ier⁻⁺[:,:,n₁,1] * 
                     composite_layer.J₀⁺[:,1,n₀] + 
                     added_layer.ieJ₀⁻[:,1,n₁,1]) 
 
-                ieJ₀⁺[:,1,n₁,n₀] = 
+                ieJ₀⁺[:,1,n₁,1] = 
                     added_layer.ieJ₀⁺[:,1,n₁,1] + 
-                    added_layer.iet⁺⁺[:,:,n₁,1] * composite_layer.J₀⁺[:,1,n₀] 
+                    added_layer.iet⁺⁺[:,:,n₁,1] * 
+                    composite_layer.J₀⁺[:,1,n₀] 
             end
         end
 
@@ -127,20 +129,23 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     for Δn = 1:length(i_λ₁λ₀_all)
         n₁ = i_λ₁λ₀_all[Δn]
-        n₀ = 1
+        n₀ = i_ref
         # Batched multiplication between added and composite
         if (n₁>0)
             composite_layer.ieR⁻⁺[:,:,n₁,1] = 
-                        composite_layer.T⁻⁻[:,:,n₁] * added_layer.ier⁻⁺[:,:,n₁,1] * 
+                        composite_layer.T⁻⁻[:,:,n₁] * 
+                        added_layer.ier⁻⁺[:,:,n₁,1] * 
                         composite_layer.T⁺⁺[:,:,n₀]
 
             composite_layer.ieR⁺⁻[:,:,n₁,1] = added_layer.ier⁺⁻[:,:,n₁,1]
 
-            composite_layer.ieT⁺⁺[:,:,n₁,n₀] = 
-                        added_layer.iet⁺⁺[:,:,n₁,1] * composite_layer.T⁺⁺[:,:,n₀]
+            composite_layer.ieT⁺⁺[:,:,n₁,1] = 
+                        added_layer.iet⁺⁺[:,:,n₁,1] * 
+                        composite_layer.T⁺⁺[:,:,n₀]
 
-            composite_layer.ieT⁻⁻[:,:,n₁,n₀] = 
-                        composite_layer.T⁻⁻[:,:,n₁] * added_layer.iet⁻⁻[:,:,n₁,1] 
+            composite_layer.ieT⁻⁻[:,:,n₁,1] = 
+                        composite_layer.T⁻⁻[:,:,n₁] * 
+                        added_layer.iet⁻⁻[:,:,n₁,1] 
         end   
     end
     # Batched multiplication between added and composite
@@ -202,11 +207,12 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_10, SFI,
     composite_layer.R⁺⁻[:] = added_layer.t⁺⁺ ⊠ composite_layer.R⁺⁻ ⊠ added_layer.t⁻⁻
 end
 
-function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, ::ScatteringInterface_10, SFI,
+function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, 
+    ::ScatteringInterface_10, SFI,
     composite_layer::CompositeLayer{FT}, 
     added_layer::AddedLayer{FT}, 
     I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
-    @unpack i_λ₁λ₀_all = RS_type 
+    @unpack i_λ₁λ₀_all, i_ref = RS_type 
     if SFI
         J₀⁺, J₀⁻ = similar(composite_layer.J₀⁺), similar(composite_layer.J₀⁺)
         ieJ₀⁺, ieJ₀⁻ = similar(composite_layer.ieJ₀⁺), similar(composite_layer.ieJ₀⁺)
@@ -216,7 +222,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, ::Scatt
 
         for Δn = 1:length(i_λ₁λ₀_all)
             n₁ = i_λ₁λ₀_all[Δn]
-            n₀ = 1
+            n₀ = i_ref
             if (n₁>0)
                 ieJ₀⁺[:,1,n₁,1] = added_layer.t⁺⁺[:,:,n₁] * 
                             (composite_layer.ieJ₀⁺[:,1,n₁,1] + 
@@ -235,7 +241,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, ::Scatt
 
     for Δn = 1:length(i_λ₁λ₀_all)
         n₁ = i_λ₁λ₀_all[Δn]
-        n₀ = 1
+        n₀ = i_ref
         # Batched multiplication between added and composite
         if (n₁>0)
             composite_layer.ieT⁺⁺[:,:,n₁,1] = 
@@ -457,12 +463,13 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     end 
 end
 
-function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, ::ScatteringInterface_11, SFI,
+function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, 
+    ::ScatteringInterface_11, SFI,
     composite_layer::Union{CompositeLayer, CompositeLayerRS}, 
     added_layer::Union{AddedLayer,AddedLayerRS}, 
     I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
  
-    @unpack i_λ₁λ₀_all = RS_type
+    @unpack i_λ₁λ₀_all, i_ref = RS_type
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ = added_layer
@@ -479,19 +486,23 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, ::Scatt
 
     for Δn = 1:length(i_λ₁λ₀_all) # in eachindex ieJ₁⁺[1,1,:,1]
         n₁ = i_λ₁λ₀_all[Δn]
-        n₀ = 1
+        n₀ = i_ref
         if (n₁>0)
             composite_layer.ieR⁻⁺[:,:,n₁,1] = ieR⁻⁺[:,:,n₁,1] +
                 T01_inv[:,:,n₁] * 
-                (ier⁻⁺[:,:,n₁,1] * T⁺⁺[:,:,n₀] + r⁻⁺[:,:,n₁] * ieT⁺⁺[:,:,n₁,1]) +    
+                (ier⁻⁺[:,:,n₁,1] * T⁺⁺[:,:,n₀] + 
+                r⁻⁺[:,:,n₁] * ieT⁺⁺[:,:,n₁,1]) +    
                 (T01_inv[:,:,n₁] * 
-                (ier⁻⁺[:,:,n₁,1] * R⁺⁻[:,:,n₀] + r⁻⁺[:,:,n₁] * ieR⁺⁻[:,:,n₁,1]) + 
+                (ier⁻⁺[:,:,n₁,1] * R⁺⁻[:,:,n₀] + 
+                r⁻⁺[:,:,n₁] * ieR⁺⁻[:,:,n₁,1]) + 
                 ieT⁻⁻[:,:,n₁,1]) * 
                 tmp_inv[:,:,n₀] * r⁻⁺[:,:,n₀] * T⁺⁺[:,:,n₀] #Suniti: Eq 14 of Raman paper draft
 
-            composite_layer.ieT⁻⁻[:,:,n₁,1] = T01_inv[:,:,n₁] * iet⁻⁻[:,:,n₁,1] +  
+            composite_layer.ieT⁻⁻[:,:,n₁,1] = 
+                T01_inv[:,:,n₁] * iet⁻⁻[:,:,n₁,1] +  
                 (T01_inv[:,:,n₁] * 
-                (ier⁻⁺[:,:,n₁,1] * R⁺⁻[:,:,n₀] + r⁻⁺[:,:,n₁] * ieR⁺⁻[:,:,n₁,1]) +
+                (ier⁻⁺[:,:,n₁,1] * R⁺⁻[:,:,n₀] + 
+                r⁻⁺[:,:,n₁] * ieR⁺⁻[:,:,n₁,1]) +
                 ieT⁻⁻[:,:,n₁,1]) * 
                 tmp_inv[:,:,n₀] * t⁻⁻[:,:,n₀] #Suniti: Eq 13 of Raman paper draft
         end
@@ -505,7 +516,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, ::Scatt
     if SFI
         for Δn = 1:length(i_λ₁λ₀_all) # in eachindex ieJ₁⁺[1,1,:,1]
             n₁ = i_λ₁λ₀_all[Δn]
-            n₀ = 1
+            n₀ = i_ref
             if (n₁>0)
                 composite_layer.ieJ₀⁻[:,1,n₁,1] = ieJ₀⁻[:,1,n₁,1] + 
                                         T01_inv[:,:,n₁] * 
@@ -513,10 +524,12 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, ::Scatt
                                         r⁻⁺[:,:,n₁] * ieJ₀⁺[:,1,n₁,1] +
                                         added_layer.ieJ₀⁻[:,1,n₁,1]) +
                                         (T01_inv[:,:,n₁] * 
-                                        (ier⁻⁺[:,:,n₁,1] * R⁺⁻[:,:,n₀] + r⁻⁺[:,:,n₁] * ieR⁺⁻[:,:,n₁,1]) +
+                                        (ier⁻⁺[:,:,n₁,1] * R⁺⁻[:,:,n₀] + 
+                                        r⁻⁺[:,:,n₁] * ieR⁺⁻[:,:,n₁,1]) +
                                         ieT⁻⁻[:,:,n₁,1]) *
                                         tmp_inv[:,:,n₀] * 
-                                        (added_layer.J₀⁻[:,1,n₀] + r⁻⁺[:,:,n₀] * J₀⁺[:,1,n₀]) #Suniti: Eq 17 of Raman paper draft
+                                        (added_layer.J₀⁻[:,1,n₀] + 
+                                        r⁻⁺[:,:,n₀] * J₀⁺[:,1,n₀]) #Suniti: Eq 17 of Raman paper draft
             end
         end
         #J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻)
@@ -532,17 +545,21 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, ::Scatt
     
     for Δn = 1:length(i_λ₁λ₀_all) #Δn in eachindex ieJ₁⁺[1,1,:,1]
         n₁ = i_λ₁λ₀_all[Δn]
-        n₀ = 1
+        n₀ = i_ref
         if (n₁>0)
-            composite_layer.ieT⁺⁺[:,:,n₁,1] = T21_inv[:,:,n₁] * ieT⁺⁺[:,:,n₁,1] +
-                    (T21_inv[:,:,n₁] * (ieR⁺⁻[:,:,n₁,1] * r⁻⁺[:,:,n₀] + R⁺⁻[:,:,n₁] * ier⁻⁺[:,:,n₁,1]) +
+            composite_layer.ieT⁺⁺[:,:,n₁,1] = 
+                    T21_inv[:,:,n₁] * ieT⁺⁺[:,:,n₁,1] +
+                    (T21_inv[:,:,n₁] * (ieR⁺⁻[:,:,n₁,1] * r⁻⁺[:,:,n₀] + 
+                    R⁺⁻[:,:,n₁] * ier⁻⁺[:,:,n₁,1]) +
                     iet⁺⁺[:,:,n₁,1]) * tmp_inv[:,:,n₀] * T⁺⁺[:,:,n₀] #Suniti: Eq 12 of Raman paper draft
 
             composite_layer.ieR⁺⁻[:,:,n₁,1] = ier⁺⁻[:,:,n₁,1] + 
                     T21_inv[:,:,n₁] * 
-                    (ieR⁺⁻[:,:,n₁,1] * t⁻⁻[:,:,n₀] + R⁺⁻[:,:,n₁] * iet⁻⁻[:,:,n₁,1]) +
+                    (ieR⁺⁻[:,:,n₁,1] * t⁻⁻[:,:,n₀] + 
+                    R⁺⁻[:,:,n₁] * iet⁻⁻[:,:,n₁,1]) +
                     (T21_inv[:,:,n₁] * 
-                    (ieR⁺⁻[:,:,n₁,1] * r⁻⁺[:,:,n₀] + R⁺⁻[:,:,n₁] * ier⁻⁺[:,:,n₁,1]) + 
+                    (ieR⁺⁻[:,:,n₁,1] * r⁻⁺[:,:,n₀] + 
+                    R⁺⁻[:,:,n₁] * ier⁻⁺[:,:,n₁,1]) + 
                     iet⁺⁺[:,:,n₁,1]) *
                     tmp_inv[:,:,n₀] * R⁺⁻[:,:,n₀] * t⁻⁻[:,:,n₀] #Suniti: Eq 15 of Raman paper draft
         end
@@ -555,7 +572,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, ::Scatt
     if SFI
         for Δn = 1:length(i_λ₁λ₀_all) #Δn in eachindex ieJ₁⁺[1,1,:,1]
             n₁ = i_λ₁λ₀_all[Δn]
-            n₀ = 1
+            n₀ = i_ref
             if (n₁>0)
                 composite_layer.ieJ₀⁺[:,1,n₁,1] = added_layer.ieJ₀⁺[:,1,n₁,1] + 
                         T21_inv[:,:,n₁] * 
@@ -574,7 +591,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, ::Scatt
 end
 
 "Compute interaction between composite and added layers"
-function interaction!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, scattering_interface::AbstractScatteringInterface, SFI,
+function interaction!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus, RRS_VS_0to1_plus, RRS_VS_1to0_plus}, scattering_interface::AbstractScatteringInterface, SFI,
                         composite_layer::Union{CompositeLayer,CompositeLayerRS}, 
                         added_layer::Union{AddedLayer,AddedLayerRS},
                         I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}

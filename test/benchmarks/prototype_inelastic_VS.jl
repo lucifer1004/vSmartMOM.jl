@@ -9,7 +9,7 @@ using Statistics
 #iBand = 1
 n2,o2 = InelasticScattering.getRamanAtmoConstants(1.7/λ₀, 300.);
 FT = Float64
-RS_type = InelasticScattering.VS_0to1_plus{FT}(
+RS_type = InelasticScattering.RRS_VS_0to1_plus{FT}(
             n2=n2,
             o2=o2);
 # Load YAML files into parameter struct
@@ -34,7 +34,7 @@ model      = model_from_parameters(RS_type, λ₀, parameters);
 #=
 RS_type = vSmartMOM.RRS(
             n2=n2,
-            o2=o2,
+            plo o2=o2,
             greek_raman = vSmartMOM.Scattering.GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)]),
             fscattRayl  = FT(1),
             ϖ_Cabannes  = FT(1), 
@@ -47,8 +47,7 @@ RS_type = vSmartMOM.RRS(
 =#
 #vSmartMOM.get_greek_raman!(RS_type, n2, o2);
 # now compute other optical parameters for Raman:
-#fscattRayl = ...
-#RS_type = vSmartMOM.RRS(...)
+#fscattRayl = ...S(...)
 # Compute Raman SSA properties:
 #vSmartMOM.getRamanSSProp!(RS_type, 1e7/ν̃, ν);
 

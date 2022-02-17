@@ -161,8 +161,8 @@ Base.@kwdef mutable struct RRS_plus{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    struct VS_0to1_plus{FT<:AbstractFloat}
+A struct which defines Vibrational and Rovibrational Raman Scattering parameters
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -209,17 +209,16 @@ Base.@kwdef mutable struct VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    struct VS_1to0_plus{FT<:AbstractFloat}
+A struct which defines Vibrational and Rovibrational Raman Scattering parameters
 # Fields
 $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef mutable struct VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType 
-    
     "Concatenated indices of band limits"
-    bandSpecLim = Array{UnitRange{Int64},1}
-    iBand::Array{Int,1} = []
-    grid_in::Array{StepRangeLen{FT},1} 
+    bandSpecLim::Vector{Any} = []#Array{UnitRange{Int64},1}
+    iBand::Vector{Any}       = []   #Array{Int,1} 
+    grid_in::Vector{Any}     = []#Vector{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}#AbstractRange{<:Real}#Vector{StepRangeLen{FT}} 
 
     "Molecular Constant for N2"
     n2::InelasticScattering.MolecularConstants{FT}
@@ -227,37 +226,34 @@ Base.@kwdef mutable struct VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType
     o2::InelasticScattering.MolecularConstants{FT}
     
     "Greek coefs in Raman calculations" 
-    greek_raman::GreekCoefs
-    greek_raman_VS_n2::GreekCoefs
-    greek_raman_VS_o2::GreekCoefs
+    greek_raman::GreekCoefs       = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
+    greek_raman_VS_n2::GreekCoefs = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
+    greek_raman_VS_o2::GreekCoefs = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
 
     "Pre-computed optical properties"
-    #values for each band
-    fscattRayl::Array{FT,1} 
-    ϖ_Cabannes::Array{FT,1} #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-
-    ϖ_λ₁λ₀::Array{FT,1}
-    i_λ₁λ₀::Array{Int,1}
-    Z⁻⁺_λ₁λ₀::Array{FT,2}
-    Z⁺⁺_λ₁λ₀::Array{FT,2}
-
-    ϖ_λ₁λ₀_VS_n2::Array{FT,1} 
-    i_λ₁λ₀_VS_n2::Array{Int,1} 
-    Z⁻⁺_λ₁λ₀_VS_n2::Array{FT,2} #independent of band
-    Z⁺⁺_λ₁λ₀_VS_n2::Array{FT,2} #independent of band
-
-    ϖ_λ₁λ₀_VS_o2::Array{FT,1} 
-    i_λ₁λ₀_VS_o2::Array{Int,1} 
-    Z⁻⁺_λ₁λ₀_VS_o2::Array{FT,2} #independent of band
-    Z⁺⁺_λ₁λ₀_VS_o2::Array{FT,2} #independent of band
-
-    i_λ₁λ₀_all::Array{Int,1}
-    i_ref::Int
-    #dτ₀::FT
-    #dτ₀_λ::FT
-    #k_Rayl_scatt::FT #σ_Rayl(λ_scatt)/σ_Rayl(λ_incident)
-    n_Raman::Int
     #ramanAtmoProp::RamanAtmosphereProperties
+    #values for each band
+    fscattRayl::Array{FT,1} = zeros(FT,1)
+    ϖ_Cabannes::Array{FT,1} = zeros(FT,1)#elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
+    
+    ϖ_λ₁λ₀::Array{FT,1}   = zeros(FT,1)#last index represents the band iB
+    i_λ₁λ₀::Array{Int,1}  = zeros(Int,1)#last index represents the band iB
+    Z⁻⁺_λ₁λ₀::Array{FT,2} = zeros(FT,1,1)#independent of band
+    Z⁺⁺_λ₁λ₀::Array{FT,2} = zeros(FT,1,1) #independent of band
+    
+    ϖ_λ₁λ₀_VS_n2::Array{FT,1}   = zeros(FT,1)#last index represents the band iB
+    i_λ₁λ₀_VS_n2::Array{Int,1}  = zeros(Int,1)#last index represents the band iB
+    Z⁻⁺_λ₁λ₀_VS_n2::Array{FT,2} = zeros(FT,1,1)#independent of band
+    Z⁺⁺_λ₁λ₀_VS_n2::Array{FT,2} = zeros(FT,1,1)#independent of band
+
+    ϖ_λ₁λ₀_VS_o2::Array{FT,1}   = zeros(FT,1) #last index represents the band iB
+    i_λ₁λ₀_VS_o2::Array{Int,1}  = zeros(Int,1) #last index represents the band iB
+    Z⁻⁺_λ₁λ₀_VS_o2::Array{FT,2} = zeros(FT,1,1) #independent of band
+    Z⁺⁺_λ₁λ₀_VS_o2::Array{FT,2} = zeros(FT,1,1) #independent of band
+
+    i_λ₁λ₀_all::Array{Int,1}    = zeros(Int,1)
+    i_ref::Int                  = 1
+    n_Raman::Int                = 1
 end
 
 Base.@kwdef mutable struct noRS_plus{FT} <: AbstractRamanType
@@ -266,6 +262,105 @@ Base.@kwdef mutable struct noRS_plus{FT} <: AbstractRamanType
     bandSpecLim = []
     iBand::Array{Int,1} = []
 end
+
+"""
+    struct RRS_VS_0to1_plus{FT<:AbstractFloat}
+A struct which defines Rotational, Vibrational and Rovibrational Raman Scattering parameters for a given monochromatic collimated (laser) source of illumination
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef mutable struct RRS_VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType 
+    "Concatenated indices of band limits"
+    bandSpecLim::Vector{Any} = []#Array{UnitRange{Int64},1}
+    iBand::Vector{Any}       = []   #Array{Int,1} 
+    grid_in::Vector{Any}     = []#Vector{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}#AbstractRange{<:Real}#Vector{StepRangeLen{FT}} 
+
+    "Molecular Constant for N2"
+    n2::InelasticScattering.MolecularConstants{FT}
+    "Molecular Constant for O2"
+    o2::InelasticScattering.MolecularConstants{FT}
+    
+    "Greek coefs in Raman calculations" 
+    greek_raman::GreekCoefs       = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
+    greek_raman_VS_n2::GreekCoefs = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
+    greek_raman_VS_o2::GreekCoefs = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
+
+    "Pre-computed optical properties"
+    #ramanAtmoProp::RamanAtmosphereProperties
+    #values for each band
+    fscattRayl::Array{FT,1} = zeros(FT,1)
+    ϖ_Cabannes::Array{FT,1} = zeros(FT,1)#elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
+    
+    ϖ_λ₁λ₀::Array{FT,1}   = zeros(FT,1)#last index represents the band iB
+    i_λ₁λ₀::Array{Int,1}  = zeros(Int,1)#last index represents the band iB
+    Z⁻⁺_λ₁λ₀::Array{FT,2} = zeros(FT,1,1)#independent of band
+    Z⁺⁺_λ₁λ₀::Array{FT,2} = zeros(FT,1,1) #independent of band
+    
+    ϖ_λ₁λ₀_VS_n2::Array{FT,1}   = zeros(FT,1)#last index represents the band iB
+    i_λ₁λ₀_VS_n2::Array{Int,1}  = zeros(Int,1)#last index represents the band iB
+    Z⁻⁺_λ₁λ₀_VS_n2::Array{FT,2} = zeros(FT,1,1)#independent of band
+    Z⁺⁺_λ₁λ₀_VS_n2::Array{FT,2} = zeros(FT,1,1)#independent of band
+
+    ϖ_λ₁λ₀_VS_o2::Array{FT,1}   = zeros(FT,1) #last index represents the band iB
+    i_λ₁λ₀_VS_o2::Array{Int,1}  = zeros(Int,1) #last index represents the band iB
+    Z⁻⁺_λ₁λ₀_VS_o2::Array{FT,2} = zeros(FT,1,1) #independent of band
+    Z⁺⁺_λ₁λ₀_VS_o2::Array{FT,2} = zeros(FT,1,1) #independent of band
+
+    i_λ₁λ₀_all::Array{Int,1}    = zeros(Int,1)
+    i_ref::Int                  = 0 #composite spectral index of incident light
+    n_Raman::Int                = 1
+end
+
+"""
+    struct RRS_VS_1to0_plus{FT<:AbstractFloat}
+A struct which defines Rotational, Vibrational and Rovibrational Raman Scattering parameters for a given monochromatic collimated (laser) source of illumination
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef mutable struct RRS_VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType 
+    "Concatenated indices of band limits"
+    bandSpecLim::Vector{Any} = []#Array{UnitRange{Int64},1}
+    iBand::Vector{Any}       = []   #Array{Int,1} 
+    grid_in::Vector{Any}     = []#Vector{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}#AbstractRange{<:Real}#Vector{StepRangeLen{FT}} 
+
+    "Molecular Constant for N2"
+    n2::InelasticScattering.MolecularConstants{FT}
+    "Molecular Constant for O2"
+    o2::InelasticScattering.MolecularConstants{FT}
+    
+    "Greek coefs in Raman calculations" 
+    greek_raman::GreekCoefs       = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
+    greek_raman_VS_n2::GreekCoefs = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
+    greek_raman_VS_o2::GreekCoefs = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
+
+    "Pre-computed optical properties"
+    #ramanAtmoProp::RamanAtmosphereProperties
+    #values for each band
+    fscattRayl::Array{FT,1} = zeros(FT,1)
+    ϖ_Cabannes::Array{FT,1} = zeros(FT,1)#elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
+    
+    ϖ_λ₁λ₀::Array{FT,1}   = zeros(FT,1)#last index represents the band iB
+    i_λ₁λ₀::Array{Int,1}  = zeros(Int,1)#last index represents the band iB
+    Z⁻⁺_λ₁λ₀::Array{FT,2} = zeros(FT,1,1)#independent of band
+    Z⁺⁺_λ₁λ₀::Array{FT,2} = zeros(FT,1,1) #independent of band
+    
+    ϖ_λ₁λ₀_VS_n2::Array{FT,1}   = zeros(FT,1)#last index represents the band iB
+    i_λ₁λ₀_VS_n2::Array{Int,1}  = zeros(Int,1)#last index represents the band iB
+    Z⁻⁺_λ₁λ₀_VS_n2::Array{FT,2} = zeros(FT,1,1)#independent of band
+    Z⁺⁺_λ₁λ₀_VS_n2::Array{FT,2} = zeros(FT,1,1)#independent of band
+
+    ϖ_λ₁λ₀_VS_o2::Array{FT,1}   = zeros(FT,1) #last index represents the band iB
+    i_λ₁λ₀_VS_o2::Array{Int,1}  = zeros(Int,1) #last index represents the band iB
+    Z⁻⁺_λ₁λ₀_VS_o2::Array{FT,2} = zeros(FT,1,1) #independent of band
+    Z⁺⁺_λ₁λ₀_VS_o2::Array{FT,2} = zeros(FT,1,1) #independent of band
+
+    i_λ₁λ₀_all::Array{Int,1}    = zeros(Int,1)
+    i_ref::Int                  =0 #composite spectral index of incident light
+    n_Raman::Int                = 1
+end
+
+
+
 
 
 
