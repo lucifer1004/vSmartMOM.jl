@@ -22,7 +22,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     @unpack size_distribution, nᵣ, nᵢ = aerosol
     
     # Imaginary part of the refractive index must be ≥ 0
-    @assert nᵢ ≥ 0
+    @assert nᵢ ≥ 0 "Imaginary part of the refractive index must be ≥ 0"
 
     # Get the refractive index's real part type
     FT = eltype(nᵣ);
@@ -31,7 +31,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     # 
     
     # Just sample from 0.25%ile to 99.75%ile:
-    start,stop = quantile(size_distribution,[0.0025,0.9975])
+    start,stop = quantile.(size_distribution,[0.0025,0.9975])
     #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
     r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max) ; norm=true) 
     

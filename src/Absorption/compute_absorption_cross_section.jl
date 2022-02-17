@@ -42,6 +42,13 @@ function compute_absorption_cross_section(
     if !(temperature isa ForwardDiff.Dual)
         temperature = AbstractFloat(temperature)
     end
+    mols = unique(hitran.mol)
+    isos = unique(hitran.iso)
+    @assert length(mols)==1 "Use only one molecule at a time"
+    @assert length(isos)==1 "Use only one molecule at a time"
+    # Get temperature grid
+    TT = get_TT(mols[1], isos[1])
+    TQ = get_TQ(mols[1], isos[1])
 
     # Store results here to return
     result = array_type(architecture)(zeros(eltype(temperature), length(grid)))
@@ -93,8 +100,12 @@ function compute_absorption_cross_section(
 
             # Apply line intensity temperature corrections
             S = hitran.Sᵢ[j]
-            if hitran.E″[j] != -1
+            # Just compute if nothing changed
+            if (j==1) || (hitran.mol[j] != hitran.mol[j-1]) || (hitran.iso[j] != hitran.iso[j-1])
                 qoft!(hitran.mol[j], hitran.iso[j], temperature, t_ref, rate)
+            end
+            if hitran.E″[j] != -1
+                #@show rate
                 S = S * rate[1] *
                         exp(c₂ * hitran.E″[j] * (1 / t_ref - 1 / temperature)) *
                         (1 - exp(-c₂ * hitran.νᵢ[j] / temperature)) / (1 - exp(-c₂ * hitran.νᵢ[j] / t_ref));
@@ -119,7 +130,7 @@ function compute_absorption_cross_section(
 
             # Run the event on the kernel 
             # That this, this function adds to each element in result, the contribution from this transition
-            event = kernel!(result_view, array_type(architecture)(grid_view), ν, γ_d, γ_l, y, S, broadening, CEF, ndrange=length(grid_view))
+            event = kernel!(result_view, grid_view, ν, γ_d, γ_l, y, S, broadening, CEF, ndrange=length(grid_view))
             wait(device, event)
             synchronize_if_gpu()
         end
@@ -176,10 +187,10 @@ end
     @inbounds A[I] += FT(S) * FT(γ_l) / (FT(pi) * (FT(γ_l)^2 + (FT(grid[I]) - FT(ν))^2))
 end
 
-@kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Voigt, CEF)
-    FT = eltype(ν)
+@kernel function line_shape!(A, grid, ν::FT, γ_d::FT, γ_l::FT, y::FT, S::FT, ::Voigt, CEF) where FT
+#    FT = eltype(ν)
     I = @index(Global, Linear)
-    @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) / FT(γ_d) * real(w(CEF, FT(cSqrtLn2) / FT(γ_d) * (FT(grid[I]) - FT(ν)) + im * FT(y)))
+    @inbounds A[I] += S * cSqrtLn2divSqrtPi / γ_d * real(w(CEF, cSqrtLn2 / γ_d * (grid[I] - ν) + im * y))
 end
 
 @kernel function line_shape32!(A, @Const(grid), ν, γ_d, γ_l, y, S, broadening, CEF)
@@ -199,16 +210,17 @@ function qoft!(M, I, T, T_ref, result)
     # Get temperature grid
     TT = get_TT(M, I)
     TQ = get_TQ(M, I)
-
+    #@show TT
     # Error if out of temperature range
     Tmin = minimum(TT); Tmax = maximum(TT)
     @assert (Tmin < T < Tmax) "TIPS2017: T ($T) must be between $Tmin K and $Tmax K."
 
     # Interpolate partition sum for specified isotopologue
     interp = DI_CS(TQ, TT)
-    Qt = interp(T)
+    Qt  = interp(T)
     Qt2 = interp(T_ref) 
 
     # Save the ratio result 
     result[1] = Qt2/Qt
+    nothing
 end
