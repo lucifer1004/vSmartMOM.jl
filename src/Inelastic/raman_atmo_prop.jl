@@ -460,6 +460,7 @@ function getRamanSSProp!(
 
         push!(grid_in, band_min:0.05:band_max)
     end
+    i_ref      = argmin(abs.(grid_in[1] .- nm_per_m/λ_inc))
     #========================================================================#
     FT = eltype(λ_inc);
     
@@ -489,8 +490,10 @@ function getRamanSSProp!(
             #t_ϖ_VRS = [0]
             #t_i_VRS = [1]
             t_ϖ_RVRS = atmo_σ_RRS[index_ramangrid_out.!=0]/atmo_σ_Rayl
-            t_i_RVRS = index_ramangrid_out[index_ramangrid_out.!=0]
-            
+            t_i_RVRS = i_ref .+ index_ramangrid_out[index_ramangrid_out.!=0]
+            #for i in eachindex(t_i_RVRS)
+            #   @show i, t_i_RVRS[i], t_ϖ_RVRS[i]
+            #end
         else 
             index_VRSgrid_out, atmo_σ_VRS, index_RVRSgrid_out, atmo_σ_RVRS = 
                 InelasticScattering.compute_optical_VRS_0to1!(RS_type, 
@@ -501,10 +504,9 @@ function getRamanSSProp!(
             t_ϖ_RVRS = atmo_σ_RVRS[index_RVRSgrid_out.!=0]/atmo_σ_Rayl
             t_i_RVRS = index_RVRSgrid_out[index_RVRSgrid_out.!=0]
             push!(t_w_VS, t_ϖ_VRS);
-        push!(t_i_VS, t_i_VRS);
+            push!(t_i_VS, t_i_VRS);
         end
-        
-
+       
         push!(t_w_RVS, t_ϖ_RVRS);
         push!(t_i_RVS, t_i_RVRS);
 
@@ -548,17 +550,17 @@ function getRamanSSProp!(
     # Vibrational o2
     i_off = 0;#length(t_i_VS[1]);
     for Δn = (i_off+1):(i_off+length(t_i_VS[1]))
-        i_λ₁λ₀_VS_o2[Δn] = bandSpecLim[1][1] - 1 + t_i_VS[1][Δn-i_off];
+        i_λ₁λ₀_VS_o2[Δn] = bandSpecLim[2][1] - 1 + t_i_VS[1][Δn-i_off];
         ϖ_λ₁λ₀_VS_o2[Δn] = t_w_VS[1][Δn-i_off];
     end    
     # Vibrational n2
     i_off = 0;#length(t_i_VS[1])+length(t_i_VS[2]);
     for Δn = (i_off+1):(i_off+length(t_i_VS[2]))
-        i_λ₁λ₀_VS_n2[Δn] = bandSpecLim[2][1] - 1 + t_i_VS[2][Δn-i_off];
+        i_λ₁λ₀_VS_n2[Δn] = bandSpecLim[3][1] - 1 + t_i_VS[2][Δn-i_off];
         ϖ_λ₁λ₀_VS_n2[Δn] = t_w_VS[2][Δn-i_off];
     end
     i_λ₁λ₀_all = unique(cat(i_λ₁λ₀, i_λ₁λ₀_VS_n2, i_λ₁λ₀_VS_o2, dims = (1)))
-    i_ref      = argmin(abs.(grid_in[1] .- nm_per_m/λ_inc))
+    
     @pack! RS_type =
         iBand, grid_in, bandSpecLim,  
         i_λ₁λ₀, ϖ_λ₁λ₀, 
@@ -634,6 +636,7 @@ function getRamanSSProp!(
 
         push!(grid_in, band_min:0.05:band_max)
     end
+    i_ref      = argmin(abs.(grid_in[1] .- nm_per_m/λ_inc))
     #========================================================================#
     FT = eltype(λ_inc);
     
@@ -663,7 +666,7 @@ function getRamanSSProp!(
             #t_ϖ_VRS = [0.]
             #t_i_VRS = [1]
             t_ϖ_RVRS = atmo_σ_RRS[index_ramangrid_out.!=0]/atmo_σ_Rayl
-            t_i_RVRS = index_ramangrid_out[index_ramangrid_out.!=0]
+            t_i_RVRS = i_ref.+index_ramangrid_out[index_ramangrid_out.!=0]
             
         else 
             index_VRSgrid_out, atmo_σ_VRS, index_RVRSgrid_out, atmo_σ_RVRS = 
@@ -722,17 +725,17 @@ function getRamanSSProp!(
     # Vibrational o2
     i_off = 0; #length(t_i_VS[1]);
     for Δn = (i_off+1):(i_off+length(t_i_VS[1]))
-        i_λ₁λ₀_VS_o2[Δn] = bandSpecLim[1][1] - 1 + t_i_VS[1][Δn-i_off];
+        i_λ₁λ₀_VS_o2[Δn] = bandSpecLim[2][1] - 1 + t_i_VS[1][Δn-i_off];
         ϖ_λ₁λ₀_VS_o2[Δn] = t_w_VS[1][Δn-i_off];
     end    
     # Vibrational n2
     i_off = 0;#length(t_i_VS[2]);
     for Δn = (i_off+1):(i_off+length(t_i_VS[2]))
-        i_λ₁λ₀_VS_n2[Δn] = bandSpecLim[2][1] - 1 + t_i_VS[2][Δn-i_off];
+        i_λ₁λ₀_VS_n2[Δn] = bandSpecLim[3][1] - 1 + t_i_VS[2][Δn-i_off];
         ϖ_λ₁λ₀_VS_n2[Δn] = t_w_VS[2][Δn-i_off];
     end
     i_λ₁λ₀_all = unique(cat(i_λ₁λ₀, i_λ₁λ₀_VS_n2, i_λ₁λ₀_VS_o2, dims = (1)))
-    i_ref      = argmin(abs.(grid_in[1] .- nm_per_m/λ_inc))
+    
     @pack! RS_type =
         iBand, grid_in, bandSpecLim,  
         i_λ₁λ₀, ϖ_λ₁λ₀, 

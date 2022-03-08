@@ -5,7 +5,7 @@ using vSmartMOM.InelasticScattering
 using Statistics
 
 
-λ₀ = 400. #nm
+λ₀ = 441. #426.5 #400. #nm
 #iBand = 1
 n2,o2 = InelasticScattering.getRamanAtmoConstants(1.7/λ₀, 300.);
 FT = Float64
